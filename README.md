@@ -1,4 +1,4 @@
-# TEMU 卖家中心全视觉自动导入系统 (TEMU Visual Upload System)
+# TEMU 中心全视觉自动导入系统 (TEMU Visual Upload System)
 
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![Framework](https://img.shields.io/badge/UI-PyQt6-orange.svg)](https://www.qt.io/)
