@@ -1,40 +1,36 @@
-# 🚀 通用轨迹自动同步系统 (Wangshu VisionFlow)
-> **基于机器视觉与硬件级模拟的跨境物流轨迹全自动盲喂同步引擎**
+# TEMU 卖家中心全视觉自动导入系统 (TEMU Visual Upload System)
 
-[![Python Version](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
-[![PyQt Version](https://img.shields.io/badge/PyQt-6.0+-green.svg)](https://www.riverbankcomputing.com/software/pyqt/)
-[![OpenCV](https://img.shields.io/badge/OpenCV-4.0+-orange.svg)](https://opencv.org/)
+[![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
+[![Framework](https://img.shields.io/badge/UI-PyQt6-orange.svg)](https://www.qt.io/)
+[![Engine](https://img.shields.io/badge/Engine-OpenCV%20%2B%20PyAutoGUI-green.svg)](https://opencv.org/)
 
----
+一个基于 **PyQt6** 现代化界面与 **OpenCV 像素矩阵匹配** 技术构建的硬核“全视觉”自动化轨迹文件导入系统。该系统彻底告别了传统 Tkinter 的简陋感，专门用于规避 TEMU 卖家中心客户端的死锁限制，通过模拟硬件层物理连招，实现全自动、高精度的文件批量轰炸式导入。
 
-
----
-
-## 📖 项目简介
-
-一款专为跨境电商物流行业定制的**物理级无缝模拟、纯视觉死锁控制的自动轨迹上传系统**。 
-
-传统的 API 对接不仅开发成本高昂，且极易受到第三方平台接口变动、加密算法升级的限制。本系统另辟蹊径，利用 **PyQt6** 搭建专业、美观的安全前台交互客户端，底层通过 **OpenCV** 实时比对屏幕上的按钮像素，再结合 **PyAutoGUI** 模拟最真实的鼠标指针移动、点击及键盘打字输入。
-
-从根本上绕过了复杂的接口限制，真正实现“只要眼睛在屏幕上看得见，程序就能替你自动导得到”的极致安全体验。
-
-### ✨ 核心特性
-
-- **🛡️ 硬件级物理盲喂**：通过底层系统级键盘映射（键盘打字与 `down` + `enter` 连招），物理锁定 Windows 文件弹窗焦点，秒级喂入文件名。
-- **🔒 双图反向死锁防线**：内置 10 分钟超长反向像素扫描，死等客户端“亮橙色主入口按钮”原色复苏。上一单没导完，下一单决不抢跑，从物理层面消灭漏单、乱单、卡死问题。
-- **⚖️ 独立开发者免责协议**：内置极其严密、硬核的法律责任豁免机制与声明弹窗，保障自研技术资产所有权与开发者个人合法劳动成果。
-- **🚀 零侵入、免配置**：无需触碰目标客户端任何底层代码或网络协议。支持直接读取本地 Excel / CSV 表格文件夹，一键自动顺序流转。
-- **🎯 纯血 PyQt 极简界面**：带有 Fusion 扁平化风格的前台监控面板、实时状态彩色徽章（Badge）及动态进度条，工作状态一目了然。
+🚀 **[点此一键下载打包好的成品程序 (default.zip)](https://github.com/linrabbit271/Upload_opencv/releases/download/1/default.zip)**
 
 ---
 
-## 🛠️ 项目目录结构
+## 🌟 核心技术亮点与“绝杀”机制
+
+- **双图反向死锁防线**：内置独创的 10 分钟反向监测机制。系统在喂单后不会盲目等待固定时间，而是利用 OpenCV 像素雷达深度检索 TEMU 导入按钮的“亮橙常态色”。一旦服务端解析完毕、按钮复苏，系统瞬间轰碎死锁，流转下一单。
+- **天才物理连招（盲喂技术）**：系统通过强锁键盘 `Alt + N` 砸向 Windows 文件选择器文件名输入框，配合高频模拟硬件打字及动态焦点下移技术，实现无需 API 接口的硬核底层文件塞入。
+- **现代化 PyQt6 视图与多线程分离**：彻底重构了旧版的 Tkinter 外壳。采用纯正的 **信号与槽 (Signals and Slots)** 机制与 `QThread` 电控异步处理，确保在大批量 AI 像素匹配和重度 I/O 操作时，TEMU 自动化控制 GUI 界面丝滑流畅、绝不卡死。
+- **特征资产实时渲染配置中心**：支持用户自主导入 4 组核心 TEMU 界面特征截图。右侧自带红绿灯状态点亮及等比例缩略图肉眼核对框，极大提升了跨屏幕、跨分辨率环境适配的弹性和容错率。
+- **全局致命崩溃拦截**：挂载了最高优先级的 `global_main_crash_catcher` 运行时拦截器。一旦发生硬件电控或环境异常，自动抓取 Traceback 并通过图形化 `QMessageBox` 拦截报错，防止程序悄无声息地闪退。
+
+---
+
+## 📁 模块化项目架构
+
+项目采用了典型的 **MVC/视图与引擎分离** 的高内聚低耦合设计。视觉识别的核心资产（`assets`）已完全规范化归档：
 
 ```text
-📂 F:\轨迹上传\
-├── 📄 main.py                # 前台 PyQt6 交互界面、免责声明及流线控制逻辑
-├── 📂 core/
-│   └── 📄 vision_engine.py   # 底层 OpenCV 视觉比对引擎与键盘鼠标控制驱动
-└── 📂 assets/                # 视觉定位模板库 (由使用者自行按屏幕分辨率截取)
-    ├── 🖼️ 初始入口_按包裹号导入轨迹.png
-    └── 🖼️ 提交按钮_确认导入.png
+Upload_opencv/
+├── main.py                     # 总调度室：负责 QApplication 生命周期、三段式启动及所有 UI 布局
+├── core/
+│   └── vision_engine.py        # 核心引擎：负责 OpenCV 像素匹配、PyAutoGUI 硬件模拟及跨线程安全通讯
+└── assets/                     # ⚙️ 核心视觉特征资产库（匹配 TEMU 系统界面）
+    ├── 初始入口_按包裹号导入轨迹.png
+    ├── 提交按钮_确认导入.png
+    ├── 文件选择_进入文档文件夹.png
+    └── 文件选择_轨迹表格挂载目录.png
