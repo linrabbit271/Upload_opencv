@@ -5,6 +5,7 @@ import traceback
 import re
 import threading
 import shutil  # 用于复制和重命名用户选择的图片
+import requests  # 🌟 用于远程授权锁通信
 
 # 自动将当前项目根目录加入环境变量
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -39,6 +40,50 @@ sys.excepthook = global_main_crash_catcher
 from core.vision_engine import YuanhuiVisionEngine, VisionSignalCommunicator
 
 CURRENT_VERSION = "v3.3.0-VisualAssets"
+
+
+# =====================================================================
+# 🌟 核心双节点远程授权锁
+# =====================================================================
+def check_remote_license(splash_widget=None):
+    """
+    远程授权校验：连接 Gitee/GitHub 双节点核验许可状态
+    """
+    gitee_url = "https://raw.giteeusercontent.com/rabbit_14_0/toolbox-license/raw/master/auth.json"
+    github_url = "https://raw.githubusercontent.com/linrabbit271/toolbox-license/refs/heads/main/auth.json"
+
+    if splash_widget:
+        splash_widget.status_lbl.setText("🔐 正在建立双节点安全授权连接...")
+        QApplication.processEvents()
+
+    auth_data = None
+    try:
+        response = requests.get(gitee_url, timeout=2.5)
+        response.raise_for_status()
+        auth_data = response.json()
+    except requests.exceptions.RequestException:
+        if splash_widget:
+            splash_widget.status_lbl.setText("🌐 主节点无响应，切入国际备用节点...")
+            QApplication.processEvents()
+        try:
+            response = requests.get(github_url, timeout=4)
+            response.raise_for_status()
+            auth_data = response.json()
+        except requests.exceptions.RequestException:
+            pass
+
+    if auth_data is None:
+        if splash_widget:
+            splash_widget.close()
+        QMessageBox.critical(None, "网络异常", "无法连接到授权服务器，请检查网络连接后重试！")
+        sys.exit(0)
+
+    if auth_data.get("status") != "active":
+        if splash_widget:
+            splash_widget.close()
+        error_msg = auth_data.get("msg", "系统安全授权已失效，拒绝启动。")
+        QMessageBox.critical(None, "授权到期", error_msg)
+        sys.exit(0)
 
 
 # ---------------- 1. 独立法律免责协议窗口 ----------------
@@ -146,12 +191,11 @@ class YuanhuiUploadApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"圆汇客户端全视觉自动导入系统 {CURRENT_VERSION}")
-        self.resize(1150, 750)  # 高度微调适应预览图
+        self.resize(1150, 750)
         self.center_window()
         self.tasks_queue = []
         self.selected_folder_path = ""
 
-        # 白嫖系统自带的飞镖图标
         standard_icon = self.style().standardIcon(QStyle.StandardPixmap.SP_CommandLink)
         self.setWindowIcon(standard_icon)
 
@@ -294,7 +338,7 @@ class YuanhuiUploadApp(QMainWindow):
 
         right_lyt.addWidget(action_card)
 
-        # ---- 🌟 核心：特征图片配置中心（新增右侧缩略图展示） ----
+        # ---- 特征图片配置中心 ----
         calibration_card = QFrame()
         calibration_card.setStyleSheet("background-color: white; border: 1px solid #ced4da; border-radius: 6px;")
         calib_lyt = QVBoxLayout(calibration_card)
@@ -305,19 +349,16 @@ class YuanhuiUploadApp(QMainWindow):
         lbl_calib_title.setStyleSheet("font-weight: bold; color: #2c3e50; font-size: 13px; border: none;")
         calib_lyt.addWidget(lbl_calib_title)
 
-        # 4组特征映射
         self.btn_snap_start = QPushButton("📂 1. 入口主按钮")
         self.btn_snap_nav = QPushButton("📂 2. 弹窗左侧文档")
         self.btn_snap_folder = QPushButton("📂 3. 目标挂载目录")
         self.btn_snap_confirm = QPushButton("📂 4. 二次确认按钮")
 
-        # 核心：对应的4个实时渲染 QLabel 预览框
         self.lbl_preview_start = QLabel()
         self.lbl_preview_nav = QLabel()
         self.lbl_preview_folder = QLabel()
         self.lbl_preview_confirm = QLabel()
 
-        # 按钮 -> (保存路径, 对应的预览Label) 的全局资产字典映射
         self.asset_mapping = {
             self.btn_snap_start: (self.engine.img_start_btn, self.lbl_preview_start),
             self.btn_snap_nav: (self.engine.img_nav_doc, self.lbl_preview_nav),
@@ -325,12 +366,10 @@ class YuanhuiUploadApp(QMainWindow):
             self.btn_snap_confirm: (self.engine.img_confirm_btn, self.lbl_preview_confirm)
         }
 
-        # 构造网格布局或精细流式垂直排列（用水平行将按钮与图片合一展示）
         for btn, (target_path, preview_lbl) in self.asset_mapping.items():
             row_layout = QHBoxLayout()
             row_layout.setSpacing(10)
 
-            # 设置按钮样式
             btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
             btn.setFixedHeight(32)
             btn.setStyleSheet("""
@@ -339,7 +378,6 @@ class YuanhuiUploadApp(QMainWindow):
             """)
             btn.clicked.connect(lambda checked, b=btn, p=target_path: self.import_user_custom_image(b, p))
 
-            # 设置图片展示 Label
             preview_lbl.setFixedSize(100, 32)
             preview_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             preview_lbl.setStyleSheet("border: 1px dashed #cbd5e1; background-color: #f8f9fa; border-radius: 4px;")
@@ -374,40 +412,33 @@ class YuanhuiUploadApp(QMainWindow):
         right_lyt.addStretch()
         work_layout.addWidget(right_frame)
 
-    # ---------------- 📂 一键导入、改名重写与实时渲染 ----------------
+    # ---------------- 📂 一键导入与渲染 ----------------
     def import_user_custom_image(self, button_widget, target_path):
         file_path, _ = QFileDialog.getOpenFileName(
             self, "选择做好的截图 (JPG/PNG)", "", "图片文件 (*.png *.jpg *.jpeg)"
         )
         if file_path:
             try:
-                # 确保 assets 目录完好
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
-                # 拷贝重写到指定目录下
                 shutil.copy(file_path, target_path)
-                # 刷新整个面板的红绿灯状态与图片缩略图
                 self.refresh_asset_status()
                 QMessageBox.information(self, "导入成功", f"特征图片已成功被系统归档并生效！")
             except Exception as e:
                 QMessageBox.critical(self, "导入错误", f"文件归档出错，请检查系统读写权限:\n{str(e)}")
 
     def refresh_asset_status(self):
-        """ 扫描 assets 文件夹，实时：1.点亮按钮颜色；2.加载缩略图展示给用户确认 """
         for btn, (path, preview_lbl) in self.asset_mapping.items():
-            base_text = btn.text().split(" ")[-1]  # 提取类似 "1. 入口主按钮"
+            base_text = btn.text().split(" ")[-1]
 
             if os.path.exists(path):
-                # 1. 按钮状态变绿
                 btn.setText(f"✅ 已导入: {base_text}")
                 btn.setStyleSheet("""
                     QPushButton { background-color: #e6f4ea; border: 1px solid #a3cfbb; color: #137333; border-radius: 4px; text-align: left; padding-left: 10px; font-size: 11px; font-weight: bold; }
                     QPushButton:hover { background-color: #d1e7dd; }
                 """)
 
-                # 2. 实时将用户导入的图片缩略展示在右侧小框里，方便他们肉眼核对！
                 pixmap = QPixmap(path)
                 if not pixmap.isNull():
-                    # 强行自适应等比例缩放到预览框大小，保持美观
                     scaled_pixmap = pixmap.scaled(
                         preview_lbl.size(),
                         Qt.AspectRatioMode.KeepAspectRatio,
@@ -416,13 +447,11 @@ class YuanhuiUploadApp(QMainWindow):
                     preview_lbl.setPixmap(scaled_pixmap)
                     preview_lbl.setStyleSheet("border: 1px solid #a3cfbb; background-color: white; border-radius: 4px;")
             else:
-                # 待导入状态
                 btn.setText(f"❌ 待导入: {base_text}")
                 btn.setStyleSheet("""
                     QPushButton { background-color: #fce8e6; border: 1px solid #f5c2c7; color: #c5221f; border-radius: 4px; text-align: left; padding-left: 10px; font-size: 11px; font-weight: bold; }
                     QPushButton:hover { background-color: #f8d7da; }
                 """)
-                # 清空图片预览，显示占位横线
                 preview_lbl.clear()
                 preview_lbl.setText("—")
                 preview_lbl.setStyleSheet(
@@ -441,7 +470,6 @@ class YuanhuiUploadApp(QMainWindow):
 
         raw_files = [f for f in os.listdir(self.selected_folder_path) if f.lower().endswith((".xlsx", ".xls", ".csv"))]
 
-        import re
         convert = lambda text: int(text) if text.isdigit() else text.lower()
         alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
         clean_files = sorted(raw_files, key=alphanum_key)
@@ -472,7 +500,6 @@ class YuanhuiUploadApp(QMainWindow):
         self.log_badge.setText(f"✅ 成功扫描到 {len(self.tasks_queue)} 个有效文件单号")
 
     def launch_visual_pipeline(self):
-        # 严格校验：四张特征资产是否齐备
         for btn, (path, _) in self.asset_mapping.items():
             if not os.path.exists(path):
                 QMessageBox.warning(self, "缺失图像特征", "请先在右侧面板导入做好的截图，才能启动！")
@@ -494,7 +521,6 @@ class YuanhuiUploadApp(QMainWindow):
             self.btn_refresh.setEnabled(True)
             self.btn_clear.setEnabled(True)
 
-            # 🌟 绝杀：整个全量流水线结束时，确保清除所有高亮，让最后一单在终点线前秒变绿
             self.table.clearSelection()
 
         threading.Thread(target=worker, daemon=True).start()
@@ -521,10 +547,7 @@ class YuanhuiUploadApp(QMainWindow):
                 self.table.item(row, 2).setText("❌ 超时失败")
                 self.table.item(row, 2).setForeground(Qt.GlobalColor.red)
 
-            # 🌟 绝杀：改完颜色后立刻清除选中高亮，防止淡蓝色背景把绿色字体强行盖住！
             self.table.clearSelection()
-
-            # 强制刷新重绘
             self.table.viewport().update()
             QApplication.processEvents()
             return
@@ -550,19 +573,34 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
 
+    # 1. 弹出闪屏
+    splash = LoadingSplash()
+    splash.show()
+
+    # 2. 闪屏前 50% 阶段
+    for i in range(1, 51):
+        time.sleep(0.008)
+        splash.progress.setValue(i)
+        if i == 20:
+            splash.status_lbl.setText("正在绑定系统原生图形总线...")
+        app.processEvents()
+
+    # 3. 🌟 校验远程许可锁
+    check_remote_license(splash)
+
+    # 4. 闪屏后 50% 阶段
+    for i in range(51, 101):
+        time.sleep(0.008)
+        splash.progress.setValue(i)
+        if i == 70:
+            splash.status_lbl.setText("正在加载 OpenCV 像素矩阵切片...")
+        if i == 90:
+            splash.status_lbl.setText("正在建立一单一结死锁防线...")
+        app.processEvents()
+
+    # 5. 弹出免责声明与拉起主界面
     disclaimer = DisclaimerWindow()
     if disclaimer.exec() == QDialog.DialogCode.Accepted:
-        splash = LoadingSplash()
-        splash.show()
-
-        for i in range(1, 101):
-            time.sleep(0.012)
-            splash.progress.setValue(i)
-            if i == 20: splash.status_lbl.setText("正在绑定系统原生图形总线...")
-            if i == 50: splash.status_lbl.setText("正在加载 OpenCV 像素矩阵切片...")
-            if i == 85: splash.status_lbl.setText("正在建立一单一结死锁防线...")
-            app.processEvents()
-
         main_win = YuanhuiUploadApp()
         splash.close()
         main_win.show()
